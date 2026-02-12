@@ -1,0 +1,7 @@
+####
+POST http://localhost:8080/service-a
+Content-Type: application/json
+
+{
+  "cep": "87043480"
+}
