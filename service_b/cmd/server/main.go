@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/carlosfiori/pos-go-fullcycle-desafio-otel/service_b/api"
+	"github.com/carlosfiori/pos-go-fullcycle-desafio-otel/utils"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const (
@@ -21,10 +23,22 @@ const (
 )
 
 func main() {
-	weatherAPIKey := os.Getenv("WEATHERAPI_KEY")
-	if weatherAPIKey == "" {
-		weatherAPIKey = "54619d224b96477a9d420100262101"
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint == "" {
+		log.Panic("OTEL_EXPORTER_OTLP_ENDPOINT environment variable not set")
 	}
+
+	shutdownTracer, err := utils.InitTracer("service-b", otelEndpoint)
+	if err != nil {
+		log.Fatalf("Failed to initialize tracer: %v", err)
+	}
+	defer func() {
+		if err := shutdownTracer(context.Background()); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
+		}
+	}()
+
+	weatherAPIKey := os.Getenv("WEATHERAPI_KEY")
 	if weatherAPIKey == "" {
 		log.Panic("WEATHERAPI_KEY environment variable not set")
 	}
@@ -34,7 +48,10 @@ func main() {
 		port = defaultPort
 	}
 
-	httpClient := &http.Client{Timeout: 5 * time.Second}
+	httpClient := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
 	handler := api.NewHandler(weatherAPIKey, httpClient)
 	router := api.SetupRouter(handler)
 

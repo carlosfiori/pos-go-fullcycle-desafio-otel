@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/carlosfiori/pos-go-fullcycle-desafio-otel/service_a/api"
+	"github.com/carlosfiori/pos-go-fullcycle-desafio-otel/utils"
 )
 
 const (
@@ -21,6 +22,21 @@ const (
 )
 
 func main() {
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint == "" {
+		log.Panic("OTEL_EXPORTER_OTLP_ENDPOINT environment variable not set")
+	}
+
+	shutdownTracer, err := utils.InitTracer("service-a", otelEndpoint)
+	if err != nil {
+		log.Fatalf("Failed to initialize tracer: %v", err)
+	}
+	defer func() {
+		if err := shutdownTracer(context.Background()); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
+		}
+	}()
+
 	serviceBURL := os.Getenv("SERVICE_B_URL")
 	if serviceBURL == "" {
 		log.Panic("SERVICE_B_URL environment variable not set")
