@@ -66,6 +66,20 @@ func (h *Handler) callServiceB(ctx context.Context, cep string) (*WeatherRespons
 		return nil, err
 	}
 
+	if resp.StatusCode == http.StatusUnprocessableEntity {
+		err := fmt.Errorf("invalid zipcode")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid zipcode")
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err := fmt.Errorf("service-b returned status %d", resp.StatusCode)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unexpected status from service-b")
+		return nil, err
+	}
+
 	var weather WeatherResponse
 	if err := json.NewDecoder(resp.Body).Decode(&weather); err != nil {
 		span.RecordError(err)
@@ -138,13 +152,17 @@ func (h *Handler) HandleCEP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error calling service B: %v", err)
 		span.RecordError(err)
-		if err.Error() == "cannot find zipcode" {
+		switch err.Error() {
+		case "cannot find zipcode":
 			span.SetStatus(codes.Error, "zipcode not found")
 			WriteError(w, "can not find zipcode", http.StatusNotFound)
-			return
+		case "invalid zipcode":
+			span.SetStatus(codes.Error, "invalid zipcode")
+			WriteError(w, "invalid zipcode", http.StatusUnprocessableEntity)
+		default:
+			span.SetStatus(codes.Error, "failed to get weather data")
+			WriteError(w, "failed to get weather data", http.StatusInternalServerError)
 		}
-		span.SetStatus(codes.Error, "failed to get weather data")
-		WriteError(w, "failed to get weather data", http.StatusInternalServerError)
 		return
 	}
 

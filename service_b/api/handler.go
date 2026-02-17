@@ -23,7 +23,7 @@ import (
 const (
 	fahrenheitMultiplier = 1.8
 	fahrenheitBase       = 32
-	kelvinBase           = 273.15
+	kelvinBase           = 273
 )
 
 var ErrNotFound = errors.New("can not find zipcode")
